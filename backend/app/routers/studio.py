@@ -30,6 +30,7 @@ async def enhance_craft_photo(file: UploadFile = File(...)):
             brightness_score=result["brightness_score"],
             contrast_score=result["contrast_score"],
             method_used=result["method_used"],
+            ai_craft_analysis=result.get("ai_craft_analysis"),
             message=result["message"]
         )
     except Exception as e:

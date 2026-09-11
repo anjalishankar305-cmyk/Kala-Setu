@@ -106,4 +106,30 @@ export const catalogService = {
   },
 };
 
+export const mlService = {
+  predictPricing: async (payload) => {
+    const response = await api.post('/ml/predict-pricing', payload);
+    return response.data;
+  },
+
+  getDemandForecast: async (craft, state) => {
+    const response = await api.get('/ml/demand-forecast', {
+      params: { craft, state }
+    });
+    return response.data;
+  },
+
+  analyzePalette: async (formData) => {
+    const response = await api.post('/ml/analyze-palette', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+
+  getDatasetStats: async () => {
+    const response = await api.get('/ml/dataset-stats');
+    return response.data;
+  },
+};
+
 export default api;

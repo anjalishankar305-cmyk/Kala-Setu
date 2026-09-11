@@ -10,15 +10,21 @@ import {
   Sparkles,
   Send,
   Volume2,
-  HelpCircle
+  HelpCircle,
+  BrainCircuit,
+  Edit3,
+  Sliders,
+  MapPin,
+  Clock
 } from 'lucide-react';
 import CameraStudio from '../components/CameraStudio';
 import AudioRecorder from '../components/AudioRecorder';
 import PricingGauge from '../components/PricingGauge';
-import { speechService, pricingService, catalogService } from '../services/api';
+import AIImageAnalysisModal from '../components/AIImageAnalysisModal';
+import { speechService, pricingService, catalogService, mlService } from '../services/api';
 import { getTranslation, speakInLanguage } from '../utils/i18n';
 
-export default function WizardPage({ onListingCreated, preferredLang = 'hi', currentArtisan }) {
+export default function WizardPage({ onListingCreated, preferredLang = 'hi', currentArtisan, onCraftAnalyzed }) {
   const [currentStep, setCurrentStep] = useState(1);
   const t = getTranslation(preferredLang);
 
@@ -39,10 +45,13 @@ export default function WizardPage({ onListingCreated, preferredLang = 'hi', cur
     description_hi: 'कुशल बुनकर द्वारा 4 दिनों में शुद्ध रेशम से हथकरघे पर निर्मित।',
   });
   const [pricingResult, setPricingResult] = useState(null);
+  const [mlEstimate, setMlEstimate] = useState(null);
   const [finalPrice, setFinalPrice] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [publishSuccess, setPublishSuccess] = useState(false);
   const [createdProduct, setCreatedProduct] = useState(null);
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [currentAnalysis, setCurrentAnalysis] = useState(null);
 
   // Initial calculation when entering Step 3 or slots change
   useEffect(() => {
@@ -56,6 +65,24 @@ export default function WizardPage({ onListingCreated, preferredLang = 'hi', cur
         });
         setPricingResult(res);
         setFinalPrice(res.recommended_range[1] || res.fair_trade_price);
+
+        // Also query Scikit-Learn ML Market Valuation
+        try {
+          const mlRes = await mlService.predictPricing({
+            craft_cluster: extractedSlots.craft_technique,
+            state: extractedSlots.state || currentArtisan?.state || 'Telangana',
+            material: extractedSlots.material,
+            production_days: Number(extractedSlots.production_days) || 1,
+            raw_material_cost: Number(extractedSlots.raw_material_cost) || 0,
+            gi_tagged: 1,
+            festive_multiplier: 1.25,
+          });
+          if (mlRes && mlRes.data) {
+            setMlEstimate(mlRes.data);
+          }
+        } catch (mlErr) {
+          console.warn('ML price estimate notice:', mlErr);
+        }
       } catch (err) {
         console.error('Pricing calculation error:', err);
       }
@@ -67,6 +94,45 @@ export default function WizardPage({ onListingCreated, preferredLang = 'hi', cur
 
   const handlePhotoProcessed = (data) => {
     setPhotoData(data);
+    if (data?.ai_craft_analysis) {
+      setCurrentAnalysis(data.ai_craft_analysis);
+      setIsAiModalOpen(true);
+      if (onCraftAnalyzed) {
+        onCraftAnalyzed({
+          ...data.ai_craft_analysis,
+          imageUrl: data.processed_image_url || data.raw_image_url,
+        });
+      }
+    }
+  };
+
+  const handleConfirmAiAnalysis = () => {
+    if (!currentAnalysis) return;
+    setExtractedSlots({
+      material: currentAnalysis.material,
+      craft_technique: currentAnalysis.craft_cluster,
+      production_days: Number(currentAnalysis.estimated_production_days) || 1,
+      raw_material_cost: Number(currentAnalysis.estimated_raw_material_cost) || 0,
+      state: currentAnalysis.state,
+    });
+    setBilingualMetadata({
+      title_en: `Authentic ${currentAnalysis.craft_cluster} (${currentAnalysis.material})`,
+      title_hi: `प्रामाणिक ${currentAnalysis.craft_cluster} (${currentAnalysis.material})`,
+      description_en: `Master handcrafted ${currentAnalysis.category.toLowerCase()} created over ${currentAnalysis.estimated_production_days} days using authentic ${currentAnalysis.material}.`,
+      description_hi: `पारंपरिक ${currentAnalysis.material} से ${currentAnalysis.estimated_production_days} दिनों में निर्मित प्रामाणिक हस्तशिल्प।`,
+    });
+    setFinalPrice(Number(currentAnalysis.predicted_fair_price) || 0);
+    if (onCraftAnalyzed) {
+      onCraftAnalyzed({
+        ...currentAnalysis,
+        imageUrl: photoData?.processed_image_url || photoData?.raw_image_url,
+      });
+    }
+    setIsAiModalOpen(false);
+  };
+
+  const handleCustomizeAiAnalysis = () => {
+    setIsAiModalOpen(false);
   };
 
   const handleTranscriptionComplete = async (transcriptText, audioBlob) => {
@@ -312,55 +378,190 @@ export default function WizardPage({ onListingCreated, preferredLang = 'hi', cur
                 preferredLang={preferredLang}
               />
 
-              {/* Verified Extracted Attribute Cards */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-200">
-                <h4 className="text-sm font-bold text-stone-900 mb-3 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-600" />
-                  <span>
-                    {preferredLang === 'hi' ? 'पहचाने गए शिल्प गुण (Verified Slots):' : 'AI Extracted Craft Slots:'}
-                  </span>
-                </h4>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                  <div className="p-3 bg-stone-50 rounded-xl border border-stone-200">
-                    <span className="text-[10px] text-stone-500 uppercase block">Material</span>
-                    <input
-                      type="text"
-                      value={extractedSlots.material}
-                      onChange={(e) => setExtractedSlots({ ...extractedSlots, material: e.target.value })}
-                      className="text-xs font-bold text-stone-900 bg-transparent w-full border-b border-transparent focus:border-amber-500 focus:outline-none"
-                    />
+              {/* Verified Extracted Attribute & Predicted Values Cards */}
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-200 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-3">
+                  <div>
+                    <h4 className="text-base font-bold text-stone-900 flex items-center gap-2">
+                      <BrainCircuit className="w-5 h-5 text-amber-600" />
+                      <span>
+                        {preferredLang === 'hi' ? 'पहचाने गए शिल्प विवरण:' : 'Identified Craft Details:'}
+                      </span>
+                    </h4>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      {preferredLang === 'hi'
+                        ? 'फ़ोटो और आवाज़ से पहचाने गए सभी मान नीचे दिए गए हैं। आप आवश्यकतानुसार किसी भी बॉक्स पर क्लिक करके मान बदल सकते हैं।'
+                        : 'Predicted values from photo and voice. You can click and edit any field directly if needed.'}
+                    </p>
                   </div>
+                  <span className="text-[11px] self-start sm:self-auto font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full border border-amber-200 flex items-center gap-1">
+                    <Edit3 className="w-3 h-3" />
+                    {preferredLang === 'hi' ? 'संपादन योग्य (Editable)' : 'User Editable'}
+                  </span>
+                </div>
 
-                  <div className="p-3 bg-stone-50 rounded-xl border border-stone-200">
-                    <span className="text-[10px] text-stone-500 uppercase block">Technique</span>
+                {/* 6-Slot Grid for All Predicted and Extracted Variables */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {/* 1. Craft Technique / Cluster */}
+                  <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 focus-within:border-amber-500 focus-within:bg-amber-50/20 transition">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] text-stone-500 uppercase font-bold tracking-wider">
+                        {preferredLang === 'hi' ? 'शिल्प शैली (Technique)' : 'Craft Technique'}
+                      </span>
+                      <span className="text-[9px] bg-amber-100 text-amber-800 font-semibold px-1.5 py-0.5 rounded">
+                        Match
+                      </span>
+                    </div>
                     <input
                       type="text"
                       value={extractedSlots.craft_technique}
                       onChange={(e) => setExtractedSlots({ ...extractedSlots, craft_technique: e.target.value })}
-                      className="text-xs font-bold text-stone-900 bg-transparent w-full border-b border-transparent focus:border-amber-500 focus:outline-none"
+                      placeholder="e.g. Pochampally Ikat"
+                      className="text-xs font-bold text-stone-900 bg-transparent w-full border-b border-stone-300 focus:border-amber-600 focus:outline-none py-1"
                     />
                   </div>
 
-                  <div className="p-3 bg-stone-50 rounded-xl border border-stone-200">
-                    <span className="text-[10px] text-stone-500 uppercase block">Days Invested</span>
+                  {/* 2. Material */}
+                  <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 focus-within:border-amber-500 focus-within:bg-amber-50/20 transition">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] text-stone-500 uppercase font-bold tracking-wider">
+                        {preferredLang === 'hi' ? 'सामग्री (Material)' : 'Material'}
+                      </span>
+                      <span className="text-[9px] bg-amber-100 text-amber-800 font-semibold px-1.5 py-0.5 rounded">
+                        Identified
+                      </span>
+                    </div>
                     <input
-                      type="number"
-                      value={extractedSlots.production_days}
-                      onChange={(e) => setExtractedSlots({ ...extractedSlots, production_days: Number(e.target.value) })}
-                      className="text-xs font-bold text-stone-900 bg-transparent w-full border-b border-transparent focus:border-amber-500 focus:outline-none"
+                      type="text"
+                      value={extractedSlots.material}
+                      onChange={(e) => setExtractedSlots({ ...extractedSlots, material: e.target.value })}
+                      placeholder="e.g. Pure Handloom Silk"
+                      className="text-xs font-bold text-stone-900 bg-transparent w-full border-b border-stone-300 focus:border-amber-600 focus:outline-none py-1"
                     />
                   </div>
 
-                  <div className="p-3 bg-stone-50 rounded-xl border border-stone-200">
-                    <span className="text-[10px] text-stone-500 uppercase block">Raw Cost (₹)</span>
+                  {/* 3. State / Origin */}
+                  <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 focus-within:border-amber-500 focus-within:bg-amber-50/20 transition">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] text-stone-500 uppercase font-bold tracking-wider">
+                        {preferredLang === 'hi' ? 'राज्य / क्षेत्र (State)' : 'State / Region'}
+                      </span>
+                      <span className="text-[9px] bg-stone-200 text-stone-700 font-semibold px-1.5 py-0.5 rounded">
+                        Wage Base
+                      </span>
+                    </div>
                     <input
-                      type="number"
-                      value={extractedSlots.raw_material_cost}
-                      onChange={(e) => setExtractedSlots({ ...extractedSlots, raw_material_cost: Number(e.target.value) })}
-                      className="text-xs font-bold text-stone-900 bg-transparent w-full border-b border-transparent focus:border-amber-500 focus:outline-none"
+                      type="text"
+                      value={extractedSlots.state || 'Telangana'}
+                      onChange={(e) => setExtractedSlots({ ...extractedSlots, state: e.target.value })}
+                      placeholder="e.g. Telangana"
+                      className="text-xs font-bold text-stone-900 bg-transparent w-full border-b border-stone-300 focus:border-amber-600 focus:outline-none py-1"
                     />
                   </div>
+
+                  {/* 4. Production Days */}
+                  <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 focus-within:border-amber-500 focus-within:bg-amber-50/20 transition">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] text-stone-500 uppercase font-bold tracking-wider">
+                        {preferredLang === 'hi' ? 'श्रम दिन (Labor Days)' : 'Labor Days Invested'}
+                      </span>
+                      <span className="text-[9px] bg-orange-100 text-orange-800 font-semibold px-1.5 py-0.5 rounded">
+                        Est. Days
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="1"
+                        max="60"
+                        value={extractedSlots.production_days}
+                        onChange={(e) => setExtractedSlots({ ...extractedSlots, production_days: Number(e.target.value) })}
+                        className="text-sm font-bold text-stone-900 bg-transparent w-full border-b border-stone-300 focus:border-amber-600 focus:outline-none py-1"
+                      />
+                      <span className="text-xs text-stone-500 font-semibold">{preferredLang === 'hi' ? 'दिन' : 'days'}</span>
+                    </div>
+                  </div>
+
+                  {/* 5. Raw Material Cost */}
+                  <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 focus-within:border-amber-500 focus-within:bg-amber-50/20 transition">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] text-stone-500 uppercase font-bold tracking-wider">
+                        {preferredLang === 'hi' ? 'कच्चा माल लागत (Raw Cost)' : 'Raw Material Cost (₹)'}
+                      </span>
+                      <span className="text-[9px] bg-orange-100 text-orange-800 font-semibold px-1.5 py-0.5 rounded">
+                        Est. Cost
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-bold text-stone-500">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="50"
+                        value={extractedSlots.raw_material_cost}
+                        onChange={(e) => setExtractedSlots({ ...extractedSlots, raw_material_cost: Number(e.target.value) })}
+                        className="text-sm font-bold text-stone-900 bg-transparent w-full border-b border-stone-300 focus:border-amber-600 focus:outline-none py-1"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 6. Predicted Fair Price (Directly Editable by User!) */}
+                  <div className="p-3 bg-gradient-to-br from-amber-50 to-orange-50/60 rounded-xl border-2 border-amber-400 focus-within:border-amber-600 shadow-sm transition">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] text-amber-900 uppercase font-extrabold tracking-wider flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-600" />
+                        {preferredLang === 'hi' ? 'अनुमानित उचित मूल्य (Price)' : 'Predicted Fair Price (₹)'}
+                      </span>
+                      <span className="text-[9px] bg-amber-600 text-white font-bold px-1.5 py-0.5 rounded">
+                        Recommended
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm font-extrabold text-amber-900">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={finalPrice || mlEstimate?.ml_predicted_price || pricingResult?.fair_trade_price || 0}
+                        onChange={(e) => setFinalPrice(Number(e.target.value))}
+                        className="text-base font-black text-amber-950 bg-transparent w-full border-b border-amber-400 focus:border-amber-700 focus:outline-none py-0.5"
+                      />
+                    </div>
+                    <div className="text-[10px] text-amber-800/80 font-medium mt-1">
+                      {preferredLang === 'hi' ? 'लागत तल' : 'Cost Floor'}: ₹{pricingResult?.cost_floor || mlEstimate?.cost_floor || 0}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Summary Banner with Live Metrics */}
+                <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-4 text-stone-600">
+                    <div>
+                      <span className="text-stone-400 block text-[10px] uppercase font-bold">{preferredLang === 'hi' ? 'लागत तल' : 'Cost Floor'}</span>
+                      <span className="font-bold text-stone-900">₹{pricingResult?.cost_floor || mlEstimate?.cost_floor || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 block text-[10px] uppercase font-bold">{preferredLang === 'hi' ? 'कारीगर मुनाफा' : 'Artisan Margin'}</span>
+                      <span className="font-bold text-emerald-700">+25% Guaranteed</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 block text-[10px] uppercase font-bold">{preferredLang === 'hi' ? 'बाज़ार स्थिति' : 'Market Status'}</span>
+                      <span className="font-bold text-amber-800">
+                        {mlEstimate?.price_elasticity?.split('(')[0]?.trim() || 'Fair Trade Optimal'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {mlEstimate && (
+                    <button
+                      type="button"
+                      onClick={() => setFinalPrice(mlEstimate.ml_predicted_price)}
+                      className="text-[11px] font-bold text-amber-800 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>{preferredLang === 'hi' ? 'सुझाया गया मूल्य पुनः लागू करें' : 'Re-apply Recommended Price'} (₹{mlEstimate.ml_predicted_price})</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Generated Bilingual Titles Preview */}
@@ -401,6 +602,39 @@ export default function WizardPage({ onListingCreated, preferredLang = 'hi', cur
           {/* STEP 3: PRICING & ONDC PUBLISH */}
           {currentStep === 3 && (
             <div className="space-y-4">
+              {/* Market Price Recommendation Card */}
+              {mlEstimate && (
+                <div className="p-4 bg-gradient-to-r from-amber-900 to-stone-900 text-white rounded-2xl shadow-md space-y-2 border border-amber-700/50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                      <BrainCircuit className="w-4 h-4 text-amber-400" />
+                      {preferredLang === 'hi' ? 'बाज़ार मूल्य सिफारिश' : 'Market Price Recommendation'}
+                    </span>
+                    <span className="text-xs px-2.5 py-0.5 bg-amber-500/20 text-amber-200 rounded-full border border-amber-500/30">
+                      {preferredLang === 'hi' ? 'प्रमाणित बेंचमार्क' : 'Verified Benchmark'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                    <div>
+                      <div className="text-2xl font-black text-white">
+                        ₹{mlEstimate.ml_predicted_price?.toLocaleString()}
+                      </div>
+                      <div className="text-[11px] text-stone-300">
+                        {mlEstimate.price_elasticity}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFinalPrice(mlEstimate.ml_predicted_price)}
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold text-xs rounded-xl shadow transition transform active:scale-95 flex items-center justify-center gap-1.5"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-stone-950" />
+                      <span>{preferredLang === 'hi' ? 'यह सुझाया गया दाम चुनें' : 'Apply Recommended Price'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <PricingGauge
                 pricingData={pricingResult}
                 finalPrice={finalPrice}
@@ -439,6 +673,17 @@ export default function WizardPage({ onListingCreated, preferredLang = 'hi', cur
           )}
         </div>
       )}
+
+      {/* AI Image Analysis & Cost Prediction Modal */}
+      <AIImageAnalysisModal
+        isOpen={isAiModalOpen}
+        analysisData={currentAnalysis}
+        processedImageUrl={photoData?.processed_image_url || photoData?.raw_image_url}
+        preferredLang={preferredLang}
+        onConfirm={handleConfirmAiAnalysis}
+        onCustomize={handleCustomizeAiAnalysis}
+        onClose={() => setIsAiModalOpen(false)}
+      />
     </div>
   );
 }

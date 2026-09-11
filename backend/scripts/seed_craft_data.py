@@ -293,11 +293,16 @@ async def seed_data(session: AsyncSession = None) -> None:
             existing_prod = await session.execute(
                 select(Product).where(Product.title_en == prod_info["title_en"])
             )
-            if not existing_prod.scalars().first():
+            prod_obj = existing_prod.scalars().first()
+            if not prod_obj:
                 prod_dict = {k: v for k, v in prod_info.items() if k != "artisan_index"}
                 prod_dict["artisan_id"] = artisan.id
                 product = Product(**prod_dict)
                 session.add(product)
+            else:
+                prod_obj.title_hi = prod_info["title_hi"]
+                prod_obj.description_hi = prod_info["description_hi"]
+                session.add(prod_obj)
 
         await session.commit()
         print("Successfully seeded KalaSetu craft benchmarks, artisans, and sample catalog products.")

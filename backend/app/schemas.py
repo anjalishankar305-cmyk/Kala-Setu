@@ -37,6 +37,21 @@ class LoginResponse(BaseModel):
 
 
 # ---------------- Vision Studio Schemas ----------------
+class AICraftAnalysis(BaseModel):
+    craft_cluster: str
+    state: str
+    category: str
+    material: str
+    confidence_score: float
+    estimated_production_days: int
+    estimated_raw_material_cost: float
+    predicted_fair_price: float
+    cost_floor: float
+    price_elasticity: str
+    visual_signatures: List[str] = Field(default_factory=list)
+    dominant_colors: List[str] = Field(default_factory=list)
+
+
 class VisionEnhanceResponse(BaseModel):
     success: bool = True
     raw_image_url: str
@@ -45,6 +60,7 @@ class VisionEnhanceResponse(BaseModel):
     contrast_score: float
     method_used: str
     message: str
+    ai_craft_analysis: Optional[AICraftAnalysis] = None
 
 
 # ---------------- Speech & NLP Schemas ----------------

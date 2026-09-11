@@ -111,3 +111,33 @@ async def test_artisan_login():
     assert "artisan" in data
     assert data["artisan"]["pehchan_id"] == "P-TEL-WEAV-0924"
     assert "Narsimha" in data["artisan"]["name"]
+
+
+@pytest.mark.asyncio
+async def test_image_enhancement_and_ai_craft_analysis():
+    transport = ASGITransport(app=app)
+    # Generate dummy 100x100 RGB JPEG bytes
+    import io
+    from PIL import Image
+    buf = io.BytesIO()
+    img = Image.new("RGB", (100, 100), color=(180, 50, 40))
+    img.save(buf, format="JPEG")
+    jpeg_bytes = buf.getvalue()
+
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        files = {"file": ("sample_ikat.jpg", jpeg_bytes, "image/jpeg")}
+        res = await ac.post("/api/studio/enhance", files=files)
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert "raw_image_url" in data
+    assert "processed_image_url" in data
+    assert "ai_craft_analysis" in data
+    analysis = data["ai_craft_analysis"]
+    assert analysis is not None
+    assert analysis["craft_cluster"] == "Pochampally Ikat"
+    assert analysis["state"] == "Telangana"
+    assert analysis["predicted_fair_price"] > 0
+    assert analysis["cost_floor"] > 0
+    assert len(analysis["visual_signatures"]) > 0

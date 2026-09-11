@@ -19,16 +19,58 @@ export default function CameraStudio({ onPhotoProcessed, preferredLang = 'hi' })
       name: preferredLang === 'hi' ? 'पोचमपल्ली इकत' : 'Pochampally Ikat',
       rawUrl: '/uploads/raw/sample_ikat.jpg',
       procUrl: '/uploads/processed/sample_ikat_studio.jpg',
+      aiAnalysis: {
+        craft_cluster: 'Pochampally Ikat',
+        state: 'Telangana',
+        category: 'Textiles',
+        material: 'Pure Handloom Silk',
+        confidence_score: 0.95,
+        estimated_production_days: 4,
+        estimated_raw_material_cost: 1600.0,
+        predicted_fair_price: 7038.0,
+        cost_floor: 4320.0,
+        price_elasticity: 'Balanced Fair Trade (Optimal Artisan Profit & Strong Demand)',
+        visual_signatures: ['Geometric Diamond Weave Grid', 'Tie-Dye Warp/Weft Matrix', 'Handloom Silk Luster'],
+        dominant_colors: ['#8B2500', '#D4AC0D', '#1F3A52']
+      }
     },
     {
       name: preferredLang === 'hi' ? 'मधुबनी पेंटिंग' : 'Madhubani Painting',
       rawUrl: '/uploads/raw/sample_madhubani.jpg',
       procUrl: '/uploads/processed/sample_madhubani_studio.jpg',
+      aiAnalysis: {
+        craft_cluster: 'Mithila Madhubani',
+        state: 'Bihar',
+        category: 'Folk Painting',
+        material: 'Handmade Recycled Paper & Canvas',
+        confidence_score: 0.96,
+        estimated_production_days: 3,
+        estimated_raw_material_cost: 600.0,
+        predicted_fair_price: 5200.0,
+        cost_floor: 2160.0,
+        price_elasticity: 'Balanced Fair Trade (Optimal Artisan Profit & Strong Demand)',
+        visual_signatures: ['Double-Line Contour Outline', 'Natural Vegetable Dye Fill', 'Folk Mythological Symmetry'],
+        dominant_colors: ['#D4AC0D', '#A93226', '#2C3E50']
+      }
     },
     {
       name: preferredLang === 'hi' ? 'ढोकरा बेल मेटल' : 'Dhokra Bell Metal',
       rawUrl: '/uploads/raw/sample_dhokra.jpg',
       procUrl: '/uploads/processed/sample_dhokra_studio.jpg',
+      aiAnalysis: {
+        craft_cluster: 'Dhokra Metal Casting',
+        state: 'Chhattisgarh',
+        category: 'Metalwork',
+        material: 'Lost-Wax Brass & Bell Metal',
+        confidence_score: 0.94,
+        estimated_production_days: 6,
+        estimated_raw_material_cost: 1500.0,
+        predicted_fair_price: 6800.0,
+        cost_floor: 4740.0,
+        price_elasticity: 'Balanced Fair Trade (Optimal Artisan Profit & Strong Demand)',
+        visual_signatures: ['Lost-Wax Clay Core Texture', 'Antique Brass/Bronze Patina', 'Metallic Specular Highlight'],
+        dominant_colors: ['#B7950B', '#6E2C00', '#2C3E50']
+      }
     },
   ];
 
@@ -127,7 +169,8 @@ export default function CameraStudio({ onPhotoProcessed, preferredLang = 'hi' })
       brightness_score: 142.5,
       contrast_score: 64.0,
       method_used: 'rembg_studio',
-      message: 'Studio lighting and background isolated.',
+      ai_craft_analysis: sample.aiAnalysis,
+      message: 'Studio lighting and background isolated with AI Craft Analysis.',
     };
     setProcessedResult(mockResult);
     setShowComparison('processed');

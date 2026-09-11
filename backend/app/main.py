@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import init_db
-from app.routers import studio, speech, pricing, catalog
+from app.routers import studio, speech, pricing, catalog, analytics
 from scripts.seed_craft_data import seed_data
 
 
@@ -13,6 +13,13 @@ from scripts.seed_craft_data import seed_data
 async def lifespan(app: FastAPI):
     # Initialize database tables
     await init_db()
+    # Initialize and warm up ML Craft Intelligence Service
+    try:
+        from app.services.ml_service import MLCraftIntelligenceService
+        ml_service = MLCraftIntelligenceService.get_instance()
+        print(f"[Lifespan] ML Craft Intelligence warm-up complete. R2={ml_service.r2_metric}")
+    except Exception as ex:
+        print(f"[Lifespan] ML warm-up notification: {ex}")
     # Run craft data seed script automatically on startup
     try:
         await seed_data()
@@ -45,6 +52,7 @@ app.include_router(studio.router, prefix=settings.API_PREFIX)
 app.include_router(speech.router, prefix=settings.API_PREFIX)
 app.include_router(pricing.router, prefix=settings.API_PREFIX)
 app.include_router(catalog.router, prefix=settings.API_PREFIX)
+app.include_router(analytics.router, prefix=settings.API_PREFIX)
 
 
 @app.get("/")

@@ -11,12 +11,14 @@ import {
   LogOut,
   ChevronDown,
   Award,
-  Landmark
+  Landmark,
+  BrainCircuit
 } from 'lucide-react';
 import WizardPage from './pages/WizardPage';
 import CatalogDashboard from './pages/CatalogDashboard';
 import LoginPage from './pages/LoginPage';
 import SchemesPage from './pages/SchemesPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 import LanguageModal from './components/LanguageModal';
 import { catalogService } from './services/api';
 import { LANGUAGES, getTranslation } from './utils/i18n';
@@ -37,6 +39,7 @@ export default function App() {
   const [isMobileEmulation, setIsMobileEmulation] = useState(false);
   const [artisans, setArtisans] = useState([]);
   const [selectedArtisan, setSelectedArtisan] = useState(null);
+  const [lastAnalyzedCraft, setLastAnalyzedCraft] = useState(null);
 
   const t = getTranslation(preferredLang);
   const currentLangObj = LANGUAGES.find((l) => l.code === preferredLang) || LANGUAGES[0];
@@ -122,7 +125,7 @@ export default function App() {
                 </span>
               </div>
               <p className="text-[11px] text-stone-400 hidden sm:block">
-                Ministry of Social Justice & Empowerment • AI Market Linkage
+                Ministry of Social Justice & Empowerment • Smart Market Linkage
               </p>
             </div>
           </div>
@@ -226,6 +229,19 @@ export default function App() {
               <Landmark className="w-4 h-4" />
               <span>{t.schemesTab}</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('analytics')}
+              className={`py-2.5 border-b-2 flex items-center gap-2 whitespace-nowrap transition ${
+                activeTab === 'analytics'
+                  ? 'border-amber-500 text-amber-400'
+                  : 'border-transparent text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <BrainCircuit className="w-4 h-4" />
+              <span>{preferredLang === 'hi' ? 'बाज़ार अंतर्दृष्टि व मूल्यांकन' : 'Market Insights & Valuation'}</span>
+            </button>
           </div>
         </div>
       </header>
@@ -244,6 +260,7 @@ export default function App() {
                   onListingCreated={() => setActiveTab('catalog')}
                   preferredLang={preferredLang}
                   currentArtisan={currentUser || selectedArtisan}
+                  onCraftAnalyzed={(analysis) => setLastAnalyzedCraft(analysis)}
                 />
               )}
               {activeTab === 'catalog' && (
@@ -259,6 +276,14 @@ export default function App() {
                   currentArtisan={currentUser || selectedArtisan}
                 />
               )}
+              {activeTab === 'analytics' && (
+                <AnalyticsPage
+                  preferredLang={preferredLang}
+                  currentArtisan={currentUser || selectedArtisan}
+                  analyzedCraft={lastAnalyzedCraft}
+                  onCraftAnalyzed={(analysis) => setLastAnalyzedCraft(analysis)}
+                />
+              )}
             </div>
           </div>
         ) : (
@@ -269,6 +294,7 @@ export default function App() {
                 onListingCreated={() => setActiveTab('catalog')}
                 preferredLang={preferredLang}
                 currentArtisan={currentUser || selectedArtisan}
+                onCraftAnalyzed={(analysis) => setLastAnalyzedCraft(analysis)}
               />
             )}
             {activeTab === 'catalog' && (
@@ -282,6 +308,14 @@ export default function App() {
               <SchemesPage
                 preferredLang={preferredLang}
                 currentArtisan={currentUser || selectedArtisan}
+              />
+            )}
+            {activeTab === 'analytics' && (
+              <AnalyticsPage
+                preferredLang={preferredLang}
+                currentArtisan={currentUser || selectedArtisan}
+                analyzedCraft={lastAnalyzedCraft}
+                onCraftAnalyzed={(analysis) => setLastAnalyzedCraft(analysis)}
               />
             )}
           </div>

@@ -16,6 +16,8 @@ STATE_SKILLED_WAGES: Dict[str, float] = {
     "Uttar Pradesh": 580.0,
     "Rajasthan": 620.0,
     "Himachal Pradesh": 640.0,
+    "Jammu & Kashmir": 750.0,
+    "Assam": 510.0,
     "Odisha": 550.0,
     "West Bengal": 570.0,
     "Tamil Nadu": 660.0,
