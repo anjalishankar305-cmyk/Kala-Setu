@@ -1,9 +1,22 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 30000,
 });
+
+export const getAssetUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+    return path;
+  }
+  const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+  if (apiBase && apiBase.startsWith('http')) {
+    const backendRoot = apiBase.replace(/\/api\/?$/, '');
+    return `${backendRoot}${path.startsWith('/') ? '' : '/'}${path}`;
+  }
+  return path;
+};
 
 export const studioService = {
   enhancePhoto: async (file) => {

@@ -12,6 +12,7 @@ import {
   FileCheck
 } from 'lucide-react';
 import { getTranslation, speakInLanguage } from '../utils/i18n';
+import { getAssetUrl } from '../services/api';
 
 export default function ProductCard({
   product,
@@ -26,7 +27,8 @@ export default function ProductCard({
 
   const title = preferredLang === 'hi' ? product.title_hi : product.title_en;
   const description = preferredLang === 'hi' ? product.description_hi : product.description_en;
-  const imageSrc = product.processed_image_path || product.raw_image_path || '/uploads/processed/sample_ikat_studio.jpg';
+  const rawImage = product.processed_image_path || product.raw_image_path || '/uploads/processed/sample_ikat_studio.jpg';
+  const imageSrc = getAssetUrl(rawImage);
 
   const speakProductDetails = () => {
     if (!('speechSynthesis' in window)) return;
